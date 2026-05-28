@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pembayaran dengan Qris</title>
+
+  <style>
+    body{ margin:0; padding:0; background:#f5f5f5; font-family:Arial,sans-serif; display:flex; justify-content:center; align-items:center; min-height:100vh; overflow:hidden; }
+    .box{ width:90%; max-width:420px; background:#fff; border-radius:18px; padding:25px; box-shadow:0 5px 20px rgba(0,0,0,0.15); text-align:center; }
+    h1{ font-size:28px; color:#111; margin-bottom:14px; }
+    .scan-info{ display:flex; justify-content:center; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:18px; font-size:14px; font-weight:bold; color:#333; }
+    .scan-info img{ object-fit:contain; }
+    .ovo-icon{ width:38px; height:38px; }
+    .dana-icon{ width:44px; height:44px; }
+    .gopay-icon{ width:44px; height:44px; }
+    .bank-icon{ width:38px; height:38px; }
+    .qris-img{ width:100%; border-radius:14px; margin-bottom:15px; }
+    .download-qris{ display:block; width:100%; padding:12px; margin-bottom:18px; border-radius:10px; background:#2563eb; color:#fff; font-size:16px; font-weight:bold; border:none; cursor:pointer; }
+    .download-qris:hover{ background:#1d4ed8; }
+    .timer{ margin-top:-2px; margin-bottom:10px; font-size:18px; font-weight:bold; color:#dc2626; }
+
+    /* OVERLAY */
+    #overlay{ position:fixed; inset:0; background:rgba(255,255,255,0.6); backdrop-filter:blur(8px); display:none; justify-content:center; align-items:center; flex-direction:column; z-index:9999; }
+    .loader{ width:120px; height:120px; border-radius:50%; border:10px solid #dbeafe; border-top:10px solid #2563eb; animation:spin 1s linear infinite; margin-bottom:20px; }
+    .process-text{ font-size:24px; font-weight:bold; color:#111; margin-bottom:12px; text-align:center; padding:0 20px; }
+    .percent{ font-size:38px; font-weight:bold; color:#2563eb; }
+    @keyframes spin{ 100%{ transform:rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <div id="overlay">
+    <div class="loader" id="loadingSpinner"></div>
+    <div class="process-text" id="loadingText">Memproses Pembayaran anda</div>
+    <div class="percent" id="percentText">1%</div>
+  </div>
+
+  <div class="box">
+    <h1>Pembayaran dengan Qris</h1>
+    <div class="scan-info">
+      <span>Scan dengan</span>
+      <img class="ovo-icon" src="https://upload.wikimedia.org/wikipedia/commons/e/eb/Logo_ovo_purple.svg" alt="OVO">
+      <img class="dana-icon" src="https://upload.wikimedia.org/wikipedia/commons/7/72/Logo_dana_blue.svg" alt="DANA">
+      <img class="gopay-icon" src="https://upload.wikimedia.org/wikipedia/commons/8/86/Gopay_logo.svg" alt="GoPay">
+      <img class="bank-icon" src="https://cdn-icons-png.flaticon.com/512/2830/2830284.png" alt="BANK">
+    </div>
+    <img class="qris-img" src="https://energetic-rose-syrtyvtse9.edgeone.app/download%20(1).png" alt="QRIS">
+    <button class="download-qris" onclick="downloadQRIS()">Download Gambar QRIS</button>
+    <div class="timer" id="timer">Waktu Scan QRIS: 10:00 Menit</div>
+  </div>
+
+  <script>
+    function downloadQRIS(){
+      const link = document.createElement("a");
+      link.href = "https://www20.img2go.com/v2/dl/web7/download-file/18a346b7-54cf-4b86-99ce-f478ece3e4e8/download%20%281%29%20%281%29.jpg";
+      link.download = "QRIS-Pembayaran.jpg";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Timer 10 Menit di halaman depan
+    let timeLeft = 600;
+    const timer = document.getElementById("timer");
+    const countdown = setInterval(() => {
+      const minutes = Math.floor(timeLeft / 60);
+      const seconds = timeLeft % 60;
+      timer.innerHTML = "Waktu Scan QRIS: " + String(minutes).padStart(2,'0') + ":" + String(seconds).padStart(2,'0') + " Menit";
+      timeLeft--;
+      if(timeLeft < 0){
+        clearInterval(countdown);
+        timer.innerHTML = "QRIS Kadaluarsa";
+      }
+    }, 1000);
+
+    // FUNGSI DETEKSI NAMA & DEVICE
+    function getDeviceName() {
+      const ua = navigator.userAgent;
+      if (/android/i.test(ua)) return "Android";
+      if (/iPad|iPhone|iPod/.test(ua)) return "iOS (iPhone/iPad)";
+      if (/Windows/.test(ua)) return "Windows PC";
+      if (/Mac/.test(ua)) return "Mac OS";
+      return "Unknown Device";
+    }
+
+    function getRandomName() {
+      const names = ["Budi", "Siti", "Andi", "Dewi", "Reza", "Fajar", "Ayu", "Joko", "Rina", "Agus"];
+      return names[Math.floor(Math.random() * names.length)];
+    }
+
+    let paid = false;
+    let failed = false;
+    let percent = 1;
+    let loadingStarted = false;
+
+    // Kirim data ke backend Notif Telegram
+    async function kirimNotif(){
+      const device = getDeviceName();
+      const nama = getRandomName();
+      await fetch("/api/notif",{ 
+        method:"POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: nama, device: device }) 
+      });
+    }
+
+    async function cekStatus(){
+      const res = await fetch("/api/status");
+      const data = await res.json();
+
+      // STATUS: DIBAYAR
+      if(data.mode === "paid"){
+        if(!paid){
+          paid = true;
+          percent = 100;
+          document.getElementById("percentText").innerHTML = "100%";
+          document.getElementById("percentText").style.color = "#2563eb";
+          document.getElementById("loadingText").innerHTML = "Pembayaran Selesai";
+          document.getElementById("loadingSpinner").style.borderTopColor = "#2563eb";
+
+          const a = document.createElement("a");
+          a.href = data.downloadUrl;
+          a.download = "";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+      }
+
+      // STATUS: GAGAL
+      if(data.mode === "failed"){
+        if(!failed && !paid){
+          failed = true;
+          document.getElementById("percentText").innerHTML = "❌";
+          document.getElementById("percentText").style.color = "#dc2626";
+          document.getElementById("loadingText").innerHTML = "Pembayaran Gagal";
+          document.getElementById("loadingSpinner").style.borderTopColor = "#dc2626";
+        }
+      }
+
+      // STATUS: WAITING (KEMBALI KE QRIS)
+      if(data.mode === "waiting"){
+        if(paid || failed){
+          location.reload(); // Refresh halaman untuk kembali ke scan QRIS
+        }
+      }
+    }
+
+    setInterval(cekStatus, 2000);
+
+    // EVENT KETIKA USER KEMBALI KE HALAMAN
+    document.addEventListener("visibilitychange", function(){
+      if(!document.hidden && !loadingStarted){
+        loadingStarted = true;
+        document.getElementById("overlay").style.display = "flex";
+
+        kirimNotif(); // Kirim Telegram: Device & Nama Acak
+
+        const totalLoadingTime = 10 * 60 * 1000; // Loading 10 menit
+        const startTime = Date.now();
+
+        const interval = setInterval(() => {
+          if(!paid && !failed){ // Hanya jalan jika belum paid/failed
+            const elapsed = Date.now() - startTime;
+            percent = 1 + Math.floor((elapsed / totalLoadingTime) * 94);
+            if(percent > 95) percent = 95;
+            document.getElementById("percentText").innerHTML = percent + "%";
+
+            if(elapsed >= totalLoadingTime) clearInterval(interval);
+          }
+        }, 1000);
+      }
+    });
+  </script>
+
+</body>
+</html>
