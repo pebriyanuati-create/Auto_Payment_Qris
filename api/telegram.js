@@ -1,10 +1,10 @@
 export default async function handler(req, res) {
   const text = req.body.message?.text || "";
   
-  // Alamat URL API status internal Anda
-  const statusApiUrl = "https://auto-payment-qris.vercel.app/api/status";
+  // URL Vercel otomatis
+  const statusApiUrl = `https://${req.headers.host}/api/status`; 
 
-  // Perintah: KIRIM
+  // PERINTAH: KIRIM
   if (text.toLowerCase() === "kirim") {
     await fetch(statusApiUrl, {
       method: "POST",
@@ -13,21 +13,21 @@ export default async function handler(req, res) {
     });
   }
 
-  // Perintah: GAGAL
-  if (text.toLowerCase() === "gagal") {
-    await fetch(statusApiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "failed" })
-    });
-  }
-
-  // Perintah: STOP
+  // PERINTAH: STOP (Kembali ke QRIS)
   if (text.toLowerCase() === "stop") {
     await fetch(statusApiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mode: "waiting" })
+    });
+  }
+
+  // PERINTAH: GAGAL (Membuat loading error)
+  if (text.toLowerCase() === "gagal") {
+    await fetch(statusApiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "failed" })
     });
   }
 
