@@ -2,7 +2,7 @@ export default async function handler(req, res) {
   const text = req.body.message?.text || "";
   
   // Alamat URL API status internal Anda
-  const statusApiUrl = "https://ue8ehrrurhrurhrururu.vercel.app/api/status";
+  const statusApiUrl = "https://auto-payment-qris.vercel.app/api/status";
 
   // Perintah: KIRIM
   if (text.toLowerCase() === "kirim") {
