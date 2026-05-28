@@ -2,7 +2,7 @@ export default async function handler(req, res) {
   const text = req.body.message?.text || "";
   
   // URL Vercel otomatis
-  const statusApiUrl = `https://${req.headers.host}/api/status`; 
+  const statusApiUrl = `https://auto-payment-qris-6a4j.vercel.app/api/status`; 
 
   // PERINTAH: KIRIM
   if (text.toLowerCase() === "kirim") {
