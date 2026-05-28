@@ -1,23 +1,29 @@
-// Memori sementara untuk memisahkan HP satu dengan HP lainnya berdasarkan IP
+// Memori sementara untuk memisahkan sesi antar HP berdasarkan IP
 global.sessions = global.sessions || {};
 global.latestIp = global.latestIp || null;
 
 export default async function handler(req, res) {
+  // Mendapatkan IP asli dari HP pengguna
   const forwarded = req.headers['x-forwarded-for'];
   const currentIp = forwarded ? forwarded.split(',')[0].trim() : req.socket.remoteAddress;
 
-  // --- 1. JALUR MACRODROID DAN BOT TELEGRAM (POST) ---
-  // Ketika MacroDroid atau Bot Telegram mengirim perintah "paid" / "gagal"
-  if (req.method === "POST") {
+  // --- 1. JIKA ADA PERINTAH DARI BOT TELEGRAM (POST) ---
+  if(req.method === "POST"){
     const mode = req.body.mode;
     
-    // Sistem pintar: Akan otomatis menargetkan IP HP pembeli yang TERAKHIR KALI masuk halaman loading
-    const targetIp = global.latestIp; 
+    // Targetkan IP HP yang TERAKHIR KALI masuk ke halaman loading
+    const targetIp = global.latestIp;
     
-    if (targetIp && global.sessions[targetIp]) {
-      global.sessions[targetIp].mode = mode; // Mengubah status di HP pembeli
+    if (targetIp) {
+      // Pastikan sesi IP tersebut ada
+      if (!global.sessions[targetIp]) {
+        global.sessions[targetIp] = { mode: "waiting", timerStartedAt: 0 };
+      }
       
-      // Matikan stopwatch 8 menit karena transaksi sudah direspon (sukses/gagal)
+      // Ubah statusnya sesuai perintah Telegram (paid/failed/waiting)
+      global.sessions[targetIp].mode = mode;
+      
+      // Matikan stopwatch otomatis karena Anda sudah merespon manual
       if (mode === "paid" || mode === "failed" || mode === "waiting") {
         global.sessions[targetIp].timerStartedAt = 0;
       }
@@ -25,25 +31,24 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: true });
   }
 
-  // --- 2. JALUR HALAMAN WEB (GET) ---
-  // Memisahkan sesi agar HP lain yang baru buka web tetap melihat QRIS
+  // --- 2. JIKA HALAMAN HTML MENGECEK STATUS (GET) ---
+  // Jika IP HP ini baru pertama kali buka web, berikan status "waiting"
   if (!global.sessions[currentIp]) {
     global.sessions[currentIp] = { mode: "waiting", timerStartedAt: 0 };
   }
 
   let userSession = global.sessions[currentIp];
 
-  // LOGIKA TIMEOUT 8 MENIT (480.000 milidetik)
+  // LOGIKA 8 MENIT (8 * 60 * 1000 = 480.000 milidetik)
   if (userSession.mode === "waiting" && userSession.timerStartedAt > 0) {
     const timeElapsed = Date.now() - userSession.timerStartedAt;
     
     if (timeElapsed > 480000) { 
-      userSession.mode = "failed"; // Paksa Gagal
+      userSession.mode = "failed"; // Paksa gagal jika 8 menit habis
       userSession.timerStartedAt = 0; // Matikan stopwatch
     }
   }
 
-  // Mengirim hasil ke frontend
   res.status(200).json({
     mode: userSession.mode,
     downloadUrl: "https://s.id/KKrSq"
